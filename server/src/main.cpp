@@ -4,6 +4,8 @@
 #include "Server.h"
 #include "Game.h"
 
+constexpr int TARGET_PFS = 30;
+
 int main() {
     std::cout << "Starting Bomberman Server..." << std::endl;
 
@@ -20,21 +22,16 @@ int main() {
     using clock = std::chrono::high_resolution_clock;
     auto lastTime = clock::now();
     
-    // Target 30 Tick Per Second
-    const std::chrono::milliseconds TARGET_FRAME_TIME(33);
+    const std::chrono::milliseconds TARGET_FRAME_TIME(1000 / TARGET_PFS);
 
     while (true) {
         auto currentTime = clock::now();
-        std::chrono::duration<float> dt = currentTime - lastTime;
+        std::chrono::duration<float> delta = currentTime - lastTime;
         lastTime = currentTime;
 
-        // 1. Network Updates (Receive Inputs, Handle Connections)
         server.update();
+        game.update(delta.count());
 
-        // 2. Game Logic (Movement, Bombs, Explosions)
-        game.update(dt.count());
-
-        // 3. Sleep to maintain frame rate
         auto frameEndTime = clock::now();
         auto frameDuration = frameEndTime - currentTime;
         

@@ -2,14 +2,12 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <cstring>
 #include <iostream>
 #include <arpa/inet.h>
+#include <errno.h>
+#include <cstring>
 
-Server::Server(Game& game_inst) : game(game_inst), tcpListenSock(-1), udpSock(-1), nextPlayerId(1) {
-    std::memset(udpClients, 0, sizeof(udpClients));
-    std::memset(udpClientKnown, 0, sizeof(udpClientKnown));
-}
+Server::Server(Game& game) : game(game), tcpListenSock(-1), udpSock(-1), nextPlayerId(1) {}
 
 Server::~Server() {
     if (tcpListenSock != -1) close(tcpListenSock);
@@ -19,8 +17,12 @@ Server::~Server() {
     }
 }
 
+// returns true on success
 bool Server::init() {
-    // 1. Setup TCP
+    return setupTcp() && setupUdp();
+}
+
+bool Server::setupTcp() {
     tcpListenSock = socket(AF_INET, SOCK_STREAM, 0);
     if (tcpListenSock < 0) {
         perror("TCP socket failed");
@@ -30,7 +32,6 @@ bool Server::init() {
     int opt = 1;
     setsockopt(tcpListenSock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
-    // Non-blocking TCP listener
     int flags = fcntl(tcpListenSock, F_GETFL, 0);
     fcntl(tcpListenSock, F_SETFL, flags | O_NONBLOCK);
 
@@ -50,18 +51,20 @@ bool Server::init() {
     }
 
     std::cout << "TCP Listening on port " << SERVER_TCP_PORT << std::endl;
+    return true;
+}
 
-    // 2. Setup UDP
+bool Server::setupUdp() {
     udpSock = socket(AF_INET, SOCK_DGRAM, 0);
     if (udpSock < 0) {
         perror("UDP socket failed");
         return false;
     }
     
+    int opt = 1;
     setsockopt(udpSock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
     
-    // Non-blocking UDP
-    flags = fcntl(udpSock, F_GETFL, 0);
+    int flags = fcntl(udpSock, F_GETFL, 0);
     fcntl(udpSock, F_SETFL, flags | O_NONBLOCK);
 
     sockaddr_in udpAddr;
@@ -79,25 +82,22 @@ bool Server::init() {
 }
 
 void Server::update() {
-    // 1. Accept new TCP connections
     handleNewConnection();
 
-    // 2. Read TCP data (Start Game command)
-    // We iterate a copy of keys or handle safely because we might remove closed sockets?
-    // Actually, simple vector of fds or map is fine for this scale.
     for (auto it = tcpClients.begin(); it != tcpClients.end();) {
-        handleTcpData(it->first);
-        // If socket closed inside handle, we need to be careful. 
-        // For simplicity, handleTcpData handles mostly reads. 
-        // We'll check validity or use a separate list if it gets complex. 
-        // Here, we just assume they stay open or we detect close later.
-        ++it;
+        int sock = it->first;
+        bool shouldRemove = handleTcpData(sock);
+        if (shouldRemove) {
+            uint8_t pid = it->second;
+            close(sock);
+            it = tcpClients.erase(it);
+            std::cout << "Closed TCP connection for socket " << sock << " (player " << int(pid) << ")" << std::endl;
+        } else {
+            ++it;
+        }
     }
-
-    // 3. Read UDP inputs
     handleUdpData();
 
-    // 4. Send World State
     broadcastState();
 }
 
@@ -107,71 +107,96 @@ void Server::handleNewConnection() {
     int clientSock = accept(tcpListenSock, (struct sockaddr*)&clientAddr, &len);
     
     if (clientSock >= 0) {
-        // Make non-blocking
         int flags = fcntl(clientSock, F_GETFL, 0);
         fcntl(clientSock, F_SETFL, flags | O_NONBLOCK);
 
-        if (nextPlayerId <= MAX_PLAYERS) {
-            uint32_t pid = nextPlayerId++;
-            tcpClients[clientSock] = pid;
-            game.addPlayer(pid);
-            
-            std::cout << "Player " << pid << " connected from " << inet_ntoa(clientAddr.sin_addr) << std::endl;
-
-            // Send ID assignment
-            ConnectResponsePacket resp;
-            resp.header.type = PacketType::ConnectResponse;
-            resp.playerId = pid;
-            send(clientSock, &resp, sizeof(resp), 0);
-        } else {
-            std::cout << "Connection rejected: Server full" << std::endl;
-            close(clientSock);
-        }
+        // We accept the connection but don't assign a player ID yet.
+        // ID 0 means "connected but not registered"
+        tcpClients[clientSock] = 0;
+        std::cout << "Client connected from " << inet_ntoa(clientAddr.sin_addr) << ". Waiting for Join packet..." << std::endl;
     }
 }
 
-void Server::handleTcpData(int clientSock) {
-    PacketHeader header;
-    int bytes = recv(clientSock, &header, sizeof(header), MSG_PEEK); // Peek first
+// returns true if connections should be closed
+bool Server::handleTcpData(int clientSock) {
+    JoinPacket packet;
+    int bytes = recv(clientSock, &packet, sizeof(packet), 0);
     
-    if (bytes > 0) {
-        if (header.type == PacketType::StartGame) {
-            // Consume
-            recv(clientSock, &header, sizeof(header), 0);
-            std::cout << "Received START_GAME command" << std::endl;
-            game.startGame();
-        } else {
-            // Consume unknown
-            char trash[128];
-            recv(clientSock, trash, sizeof(trash), 0);
-        }
-    } else if (bytes == 0) {
-        // Disconnected?
-        // We handle disconnect logic if needed, but for now we keep the slot? 
-        // Or remove player. Simple game: player disconnects -> restart server mostly.
+    if (bytes < 0) {
+        // EAGAIN - Resource temporarily unavailable
+        // EWOULDBLOCK - Operation would block
+        if (errno == EAGAIN || errno == EWOULDBLOCK) return false;
+        std::cerr << "Error on socket " << clientSock << ": " << strerror(errno) << std::endl;
+        return true;
     }
+
+    if (bytes == 0) {
+        std::cout << "Peer closed TCP connection on socket " << clientSock << std::endl;
+        return true;
+    }
+
+    if (tcpClients[clientSock] == 0 && nextPlayerId <= MAX_PLAYERS) {
+        uint8_t pid = nextPlayerId++;
+        tcpClients[clientSock] = pid;
+        game.addPlayer(pid);
+        
+        sockaddr_in addr;
+        socklen_t len = sizeof(addr);
+        getpeername(clientSock, (struct sockaddr*)&addr, &len);
+        
+        udpClients[pid] = addr;
+        udpClients[pid].sin_port = htons(packet.listeningPort);
+        
+        std::cout << "Player " << pid << " registered from " << inet_ntoa(addr.sin_addr) << ":" << ntohs(udpClients[pid].sin_port) << std::endl;
+
+        ConnectResponsePacket resp;
+        resp.type = PacketType::ConnectResponse;
+        resp.playerId = pid;
+        send(clientSock, &resp, sizeof(resp), 0);
+        
+        // no TCP communication after joining
+        return true;
+    }
+    return false;
 }
 
 void Server::handleUdpData() {
-    InputPacket packet;
+    // must be at last as big as smallest possible input from clients
+    uint8_t buffer[256];
     sockaddr_in senderAddr;
     socklen_t len = sizeof(senderAddr);
-    
-    // Process all pending UDP packets
+
+    // iterate over pending packets
     while (true) {
-        int bytes = recvfrom(udpSock, &packet, sizeof(packet), 0, (struct sockaddr*)&senderAddr, &len);
-        if (bytes < 0) break; // No more data (EAGAIN/EWOULDBLOCK) or error
-        
-        if (bytes >= (int)sizeof(InputPacket) && packet.header.type == PacketType::Input) {
-            uint32_t pid = packet.playerId;
-            if (pid >= 1 && pid <= MAX_PLAYERS) {
-                // Update known UDP address for this player
-                udpClients[pid] = senderAddr;
-                udpClientKnown[pid] = true;
-                
-                // Process Input
-                game.processInput(pid, packet.dx, packet.dy, packet.placeBomb);
+        int bytes = recvfrom(udpSock, buffer, sizeof(buffer), 0, (struct sockaddr*)&senderAddr, &len);
+        if (bytes < 0) break; // EAGAIN/EWOULDBLOCK or error
+        if (bytes == 0) continue;
+
+        PacketType *ptype = (PacketType*)buffer;
+        switch (*ptype) {
+            case PacketType::Input: {
+                InputPacket *input = (InputPacket*)buffer;
+                uint8_t pid = input->playerId;
+                game.processInput(pid, input->cmd);
+                break;
             }
+            case PacketType::StartGame: {
+                StartPacket *sp = (StartPacket*)buffer;
+                std::cout << "Received UDP START command from player " << int(sp->playerId) << std::endl;
+                game.startGame();
+                broadcastState();
+                break;
+            }
+            case PacketType::Restart: {
+                RestartPacket *rp = (RestartPacket*)buffer;
+                std::cout << "Received UDP RESTART command from player " << int(rp->playerId) << std::endl;
+                game.reset();
+                game.startGame();
+                broadcastState();
+                break;
+            }
+            default:
+                break;
         }
     }
 }
@@ -180,9 +205,7 @@ void Server::broadcastState() {
     WorldStatePacket packet;
     game.fillStatePacket(packet);
     
-    for (int i = 1; i <= MAX_PLAYERS; ++i) {
-        if (udpClientKnown[i]) {
-            sendto(udpSock, &packet, sizeof(packet), 0, (struct sockaddr*)&udpClients[i], sizeof(udpClients[i]));
-        }
+    for (const auto& kv : udpClients) {
+        sendto(udpSock, &packet, sizeof(packet), 0, (struct sockaddr*)&kv.second, sizeof(kv.second));
     }
 }

@@ -2,11 +2,21 @@
 #include <iostream>
 #include <algorithm>
 #include <random>
+#include <array>
+#include <utility>
 
-// Game Constants
-constexpr float BOMB_TIMER = 5.0f;
-constexpr float EXPLOSION_TIMER = 0.5f;
+constexpr float BOMB_TTL = 3.0f;
+constexpr float EXPLOSION_TTL = 0.5f;
+constexpr int WALL_CHANCE_PERCENT = 60;
 constexpr int BOMB_RANGE = 2; 
+constexpr int BOMB_LIMIT= 1; 
+
+constexpr std::array<std::pair<int,int>, 4> SPAWN_POINTS = {{
+    {0, 0},
+    {GRID_WIDTH - 1, 0},
+    {0, GRID_HEIGHT - 1},
+    {GRID_WIDTH - 1, GRID_HEIGHT - 1}
+}};
 
 Game::Game() : running(false), winnerId(0) {
     grid.resize(GRID_SIZE, TileState::Empty);
@@ -20,40 +30,39 @@ void Game::reset() {
     explosions.clear();
     generateMap();
     
-    // Reset players to spawn positions
     for (auto& [id, player] : players) {
         player.alive = true;
-        if (id == 1) { player.x = 0; player.y = 0; }
-        else if (id == 2) { player.x = GRID_WIDTH - 1; player.y = 0; }
-        else if (id == 3) { player.x = 0; player.y = GRID_HEIGHT - 1; }
-        else if (id == 4) { player.x = GRID_WIDTH - 1; player.y = GRID_HEIGHT - 1; }
+        auto sp = SPAWN_POINTS[id - 1];
+        player.x = sp.first;
+        player.y = sp.second;
     }
 }
 
-void Game::addPlayer(uint32_t id) {
+void Game::addPlayer(uint8_t id) {
     if (players.count(id)) return;
     Player p;
     p.id = id;
     p.alive = true;
-    
-    // Default spawns
-    if (id == 1) { p.x = 0; p.y = 0; }
-    else if (id == 2) { p.x = GRID_WIDTH - 1; p.y = 0; }
-    else if (id == 3) { p.x = 0; p.y = GRID_HEIGHT - 1; }
-    else if (id == 4) { p.x = GRID_WIDTH - 1; p.y = GRID_HEIGHT - 1; }
-    else { p.x = 0; p.y = 0; } // Fallback
+    auto sp = SPAWN_POINTS[id - 1];
+    p.x = sp.first;
+    p.y = sp.second;
 
     players[id] = p;
-    std::cout << "Player " << id << " added at " << p.x << "," << p.y << std::endl;
+    std::cout << "Player " << int(id) << " added at " << p.x << "," << p.y << std::endl;
 }
 
-void Game::removePlayer(uint32_t id) {
+void Game::removePlayer(uint8_t id) {
     players.erase(id);
 }
 
 void Game::startGame() {
     if (running) return;
-    reset(); // Reset map and positions
+
+    if (players.size() < 2) {
+        std::cout << "Cannot start game: need at least 2 players (have " << players.size() << ")" << std::endl;
+        return;
+    }
+    reset();
     running = true;
     std::cout << "Game Started!" << std::endl;
 }
@@ -62,19 +71,19 @@ bool Game::isWalkable(int x, int y) const {
     if (x < 0 || x >= GRID_WIDTH || y < 0 || y >= GRID_HEIGHT) return false;
     int idx = y * GRID_WIDTH + x;
     
-    // Check static grid
     if (grid[idx] != TileState::Empty && grid[idx] != TileState::Explosion) {
         return false; 
     }
 
-    // Check bombs (they are obstacles)
     for (const auto& b : bombs) {
         if (b.x == x && b.y == y) return false;
     }
 
-    // Note: Players can walk through each other in this simple version, 
-    // or we can make them solid. Let's make them walk through for simplicity/fewer stuck bugs.
-    
+    for (const auto& kv : players) {
+        const Player& pl = kv.second;
+        if (pl.alive && pl.x == x && pl.y == y) return false;
+    }
+
     return true;
 }
 
@@ -87,21 +96,18 @@ void Game::generateMap() {
 
     for (int y = 0; y < GRID_HEIGHT; ++y) {
         for (int x = 0; x < GRID_WIDTH; ++x) {
-            // Indestructible walls (Odd x Odd)
+            // indestructible walls (odd x odd)
             if (x % 2 != 0 && y % 2 != 0) {
                 grid[y * GRID_WIDTH + x] = TileState::BlockedIndestructible;
             } else {
-                // Destructible walls random chance
-                // Avoid spawn zones
-                bool safeZone = false;
-                if ((x < 3 && y < 3) || // TL
-                    (x > GRID_WIDTH - 4 && y < 3) || // TR
-                    (x < 3 && y > GRID_HEIGHT - 4) || // BL
-                    (x > GRID_WIDTH - 4 && y > GRID_HEIGHT - 4)) { // BR
-                    safeZone = true;
-                }
-
-                if (!safeZone && dis(gen) < 60) { // 60% chance for wall
+                // destructible walls random chance
+                bool spawnZone = (
+                    (x < 3 && y < 3) || // top left
+                    (x > GRID_WIDTH - 4 && y < 3) || // top right
+                    (x < 3 && y > GRID_HEIGHT - 4) || // bottom left
+                    (x > GRID_WIDTH - 4 && y > GRID_HEIGHT - 4) // bottom right
+               );
+                if (!spawnZone && dis(gen) < WALL_CHANCE_PERCENT) {
                      grid[y * GRID_WIDTH + x] = TileState::BlockedDestructible;
                 }
             }
@@ -109,144 +115,116 @@ void Game::generateMap() {
     }
 }
 
-void Game::processInput(uint32_t playerId, int8_t dx, int8_t dy, bool placeBomb) {
+void Game::processInput(uint8_t playerId, InputCommand cmd) {
     if (!running) return;
     if (players.find(playerId) == players.end()) return;
     
     Player& p = players[playerId];
     if (!p.alive) return;
 
-    // Movement
-    if (dx != 0 || dy != 0) {
-        // Enforce single step
-        int nx = p.x;
-        int ny = p.y;
-        
-        if (dx > 0) nx++;
-        else if (dx < 0) nx--;
-        
-        if (dy > 0) ny++;
-        else if (dy < 0) ny--;
-        
-        // Very basic movement: only one axis at a time or diagonal?
-        // Let's prioritize one axis if both pressed? Or allow diagonal? 
-        // Grid based movement usually disallows diagonal if it clips corners.
-        // Let's just try to move to target.
-        
-        // Actually, let's process X then Y for sliding? 
-        // Or just atomic move.
-        // The packet has dx, dy.
-        
-        // Simplification: Just check if target cell is walkable.
-        // To prevent instant teleporting across map, input should be normalized by client, 
-        // but here we trust dx/dy is -1, 0, 1.
-        
-        if (nx != p.x || ny != p.y) {
-             if (isWalkable(nx, ny)) {
-                 p.x = nx;
-                 p.y = ny;
-             } else if (nx != p.x && isWalkable(nx, p.y)) {
-                 // Try X only
-                 p.x = nx;
-             } else if (ny != p.y && isWalkable(p.x, ny)) {
-                 // Try Y only
-                 p.y = ny;
-             }
-        }
+    int nx = p.x;
+    int ny = p.y;
+
+    switch (cmd) {
+        case InputCommand::MoveNorth: ny--; break;
+        case InputCommand::MoveSouth: ny++; break;
+        case InputCommand::MoveWest: nx--; break;
+        case InputCommand::MoveEast: nx++; break;
+        case InputCommand::PlaceBomb: 
+            spawnBomb(p.x, p.y, p.id);
+            return;
+        default: return;
     }
 
-    // Bomb
-    if (placeBomb) {
-        spawnBomb(p.x, p.y, p.id);
+    if (nx != p.x || ny != p.y) {
+        if (isWalkable(nx, ny)) {
+            p.x = nx;
+            p.y = ny;
+        }
     }
 }
 
-void Game::spawnBomb(int x, int y, uint32_t ownerId) {
-    // Check if bomb already exists there
+void Game::spawnBomb(int x, int y, uint8_t ownerId) {
+    // check if bomb already exists there
     for (const auto& b : bombs) {
         if (b.x == x && b.y == y) return;
     }
     
-    // Check max bombs? (Infinite for now as per spec "no powerups" implying default limitation or none)
-    // Spec says nothing about limits, but usually it's 1. 
-    // Let's count user's bombs.
-    int userBombs = 0;
-    for(const auto& b : bombs) if(b.ownerId == ownerId) userBombs++;
+    int playerBombs = 0;
+    for (const auto& b : bombs) if (b.ownerId == ownerId) playerBombs++;
 
-    if (userBombs < 1) { // Default 1 bomb limit
-        bombs.push_back({x, y, BOMB_TIMER, ownerId});
+    if (playerBombs < BOMB_LIMIT) {
+        bombs.push_back({x, y, BOMB_TTL, ownerId});
     }
 }
 
-void Game::update(float dt) {
+void Game::update(float delta) {
     if (!running) return;
 
-    // Update Bombs
+    updateBombs(delta);
+    updateExplosions(delta);
+
+    checkPlayerDeath();
+}
+
+void Game::updateBombs(float delta) {
     for (auto it = bombs.begin(); it != bombs.end(); ) {
-        it->timer -= dt;
-        if (it->timer <= 0) {
+        it->ttl -= delta;
+        if (it->ttl <= 0) {
             triggerExplosion(*it);
             it = bombs.erase(it);
         } else {
             ++it;
         }
     }
+}
 
-    // Update Explosions
+void Game::updateExplosions(float delta) {
     for (auto it = explosions.begin(); it != explosions.end(); ) {
-        it->timer -= dt;
-        if (it->timer <= 0) {
+        it->ttl -= delta;
+        if (it->ttl <= 0) {
             it = explosions.erase(it);
         } else {
-            // Kill players in explosion
+            // kill players in explosion
             for (auto& [id, p] : players) {
                 if (p.alive && p.x == it->x && p.y == it->y) {
                     p.alive = false;
-                    std::cout << "Player " << id << " died!" << std::endl;
+                    std::cout << "Player " << int(id) << " died!" << std::endl;
                 }
             }
             ++it;
         }
     }
-    
-    checkPlayerDeath();
 }
 
 void Game::triggerExplosion(const Bomb& bomb) {
+    // returns true if the ray should continue, false otherwise
     auto addExplosion = [&](int x, int y) {
-        if (x < 0 || x >= GRID_WIDTH || y < 0 || y >= GRID_HEIGHT) return false; // Stop ray
+        if (x < 0 || x >= GRID_WIDTH || y < 0 || y >= GRID_HEIGHT) return false;
         int idx = y * GRID_WIDTH + x;
         
-        if (grid[idx] == TileState::BlockedIndestructible) return false; // Stop ray
+        if (grid[idx] == TileState::BlockedIndestructible) return false;
         
-        explosions.push_back({x, y, EXPLOSION_TIMER});
+        explosions.push_back({x, y, EXPLOSION_TTL});
         
+        // destroy breakable walls and stop
         if (grid[idx] == TileState::BlockedDestructible) {
-            grid[idx] = TileState::Empty; // Destroy wall
-            return false; // Stop ray after destroying wall
+            grid[idx] = TileState::Empty;
+            return false;
         }
-        return true; // Continue ray
+        return true;
     };
 
-    // Center
     addExplosion(bomb.x, bomb.y);
-
-    // 4 Directions
-    int range = BOMB_RANGE;
-    // Right
-    for (int i = 1; i <= range; ++i) if (!addExplosion(bomb.x + i, bomb.y)) break;
-    // Left
-    for (int i = 1; i <= range; ++i) if (!addExplosion(bomb.x - i, bomb.y)) break;
-    // Down
-    for (int i = 1; i <= range; ++i) if (!addExplosion(bomb.x, bomb.y + i)) break;
-    // Up
-    for (int i = 1; i <= range; ++i) if (!addExplosion(bomb.x, bomb.y - i)) break;
+    for (int i = 1; i <= BOMB_RANGE; ++i) if (!addExplosion(bomb.x + i, bomb.y)) break;
+    for (int i = 1; i <= BOMB_RANGE; ++i) if (!addExplosion(bomb.x - i, bomb.y)) break;
+    for (int i = 1; i <= BOMB_RANGE; ++i) if (!addExplosion(bomb.x, bomb.y + i)) break;
+    for (int i = 1; i <= BOMB_RANGE; ++i) if (!addExplosion(bomb.x, bomb.y - i)) break;
 }
 
 void Game::checkPlayerDeath() {
-    // Check winner
     int aliveCount = 0;
-    uint32_t lastAlive = 0;
+    uint8_t lastAlive = 0;
     for (const auto& [id, p] : players) {
         if (p.alive) {
             aliveCount++;
@@ -254,37 +232,36 @@ void Game::checkPlayerDeath() {
         }
     }
 
-    if (aliveCount <= 1 && players.size() > 1) { // If >1 players started, last one wins
-         winnerId = lastAlive;
-         // running = false; // Keep it running or stop? "Winner is..." implies end.
-         // Let's keep sending state for a bit?
-         // Spec: "Winner is the last one standing."
+    if (aliveCount <= 1) {
+        if (aliveCount == 0) {
+            // DRAW
+            winnerId = 5;
+            std::cout << "Game ended in a draw." << std::endl;
+        } else {
+            winnerId = lastAlive;
+            std::cout << "Player " << int(winnerId) << " wins the match." << std::endl;
+        }
+        running = false;
     }
 }
 
 void Game::fillStatePacket(WorldStatePacket& packet) {
-    packet.header.type = PacketType::WorldState;
+    packet.type = PacketType::WorldState;
     packet.gameRunning = running;
     packet.winnerId = winnerId;
 
-    // 1. Copy base grid (Walls)
+    // copy base grid
     for (int i = 0; i < GRID_SIZE; ++i) {
         packet.grid[i] = grid[i];
     }
 
-    // 2. Overlay Bombs
-    for (const auto& b : bombs) {
-        int idx = b.y * GRID_WIDTH + b.x;
-        if (idx >= 0 && idx < GRID_SIZE) packet.grid[idx] = TileState::Bomb;
-    }
-
-    // 3. Overlay Explosions
+    // overlay explosions
     for (const auto& e : explosions) {
         int idx = e.y * GRID_WIDTH + e.x;
         if (idx >= 0 && idx < GRID_SIZE) packet.grid[idx] = TileState::Explosion;
     }
 
-    // 4. Overlay Players (on top of everything)
+    // overlay players 
     for (const auto& [id, p] : players) {
         if (!p.alive) continue;
         int idx = p.y * GRID_WIDTH + p.x;
@@ -295,4 +272,12 @@ void Game::fillStatePacket(WorldStatePacket& packet) {
             else if (id == 4) packet.grid[idx] = TileState::Player4;
         }
     }
+
+    // overlay bombs
+    for (const auto& b : bombs) {
+        int idx = b.y * GRID_WIDTH + b.x;
+        if (idx >= 0 && idx < GRID_SIZE) packet.grid[idx] = TileState::Bomb;
+    }
+    // Bombs are overlaid last so if a player placed a bomb and hasn't moved,
+    // only the bomb will be displayed. This is the intended behavior.
 }

@@ -1,0 +1,260 @@
+[gd_scene load_steps=13 format=4 uid="uid://r3saganlkpaw"]
+
+[ext_resource type="Script" uid="uid://f60tm0qcu678" path="res://scripts/JoinButton.cs" id="1_5rswr"]
+[ext_resource type="Script" uid="uid://71ldxhob25id" path="res://scripts/GameManager.cs" id="1_npm0p"]
+[ext_resource type="Texture2D" uid="uid://dkawkaltii21d" path="res://tileset.png" id="3_3f0tl"]
+[ext_resource type="Script" uid="uid://d1ep5qkur8gbi" path="res://scripts/GameBoard.cs" id="3_kcflt"]
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_35qqh"]
+texture = ExtResource("3_3f0tl")
+texture_region_size = Vector2i(48, 48)
+0:0/0 = 0
+1:0/0 = 0
+2:0/0 = 0
+3:0/0 = 0
+0:1/0 = 0
+1:1/0 = 0
+2:1/0 = 0
+3:1/0 = 0
+0:2/0 = 0
+
+[sub_resource type="TileSet" id="TileSet_viiso"]
+tile_size = Vector2i(48, 48)
+sources/0 = SubResource("TileSetAtlasSource_35qqh")
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_kcflt"]
+texture = ExtResource("3_3f0tl")
+texture_region_size = Vector2i(48, 48)
+0:0/0 = 0
+1:0/0 = 0
+2:0/0 = 0
+3:0/0 = 0
+0:1/0 = 0
+1:1/0 = 0
+2:1/0 = 0
+3:1/0 = 0
+0:2/0 = 0
+
+[sub_resource type="TileSet" id="TileSet_35qqh"]
+tile_size = Vector2i(48, 48)
+sources/0 = SubResource("TileSetAtlasSource_kcflt")
+
+[sub_resource type="LabelSettings" id="LabelSettings_npm0p"]
+font_size = 30
+
+[sub_resource type="Animation" id="Animation_kcflt"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:rotation")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [-0.17453292]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath(".:scale")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(1.1, 1.1)]
+}
+
+[sub_resource type="Animation" id="Animation_3f0tl"]
+resource_name = "Title"
+length = 5.0
+loop_mode = 2
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:rotation")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(-0.1333, 0, 5),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [-0.17453292, -0.17453292, 0.17453292]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath(".:scale")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 5),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector2(1.1, 1.1), Vector2(0.9, 0.9)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_35qqh"]
+_data = {
+&"RESET": SubResource("Animation_kcflt"),
+&"Title": SubResource("Animation_3f0tl")
+}
+
+[node name="GameManager" type="Node2D" node_paths=PackedStringArray("startButton", "startScreen", "gameScreen", "endScreen")]
+script = ExtResource("1_npm0p")
+startButton = NodePath("GameCanvasLayer/StartButton")
+startScreen = NodePath("StartCanvasLayer")
+gameScreen = NodePath("GameCanvasLayer")
+endScreen = NodePath("EndCanvasLayer")
+
+[node name="GameBoard" type="Node2D" parent="."]
+script = ExtResource("3_kcflt")
+
+[node name="BackgroundTileMapLayer" type="TileMapLayer" parent="GameBoard"]
+tile_map_data = PackedByteArray("AAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAACAAAAAAAAAAAAAAACAAEAAAAAAAAAAAADAAEAAAAAAAAAAAAEAAEAAAAAAAAAAAAFAAEAAAAAAAAAAAAGAAEAAAAAAAAAAAAGAAIAAAAAAAAAAAAHAAIAAAAAAAAAAAAIAAIAAAAAAAAAAAAJAAIAAAAAAAAAAAAKAAIAAAAAAAAAAAAKAAMAAAAAAAAAAAALAAMAAAAAAAAAAAAMAAMAAAAAAAAAAAAMAAIAAAAAAAAAAAALAAEAAAAAAAAAAAAKAAEAAAAAAAAAAAAJAAEAAAAAAAAAAAAIAAEAAAAAAAAAAAAHAAAAAAAAAAAAAAAGAAAAAAAAAAAAAAAFAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAADAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAJAAAAAAAAAAAAAAAKAAAAAAAAAAAAAAALAAAAAAAAAAAAAAAMAAAAAAAAAAAAAAANAAAAAAAAAAAAAAAOAAAAAAAAAAAAAAAPAAAAAAAAAAAAAAAHAAEAAAAAAAAAAAAMAAEAAAAAAAAAAAANAAEAAAAAAAAAAAALAAIAAAAAAAAAAAANAAIAAAAAAAAAAAAOAAIAAAAAAAAAAAAPAAIAAAAAAAAAAAAOAAEAAAAAAAAAAAAPAAEAAAAAAAAAAAABAAEAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAIAAAAAAAAAAAABAAIAAAAAAAAAAAACAAIAAAAAAAAAAAADAAIAAAAAAAAAAAAEAAIAAAAAAAAAAAAFAAIAAAAAAAAAAAACAAMAAAAAAAAAAAABAAMAAAAAAAAAAAAAAAMAAAAAAAAAAAADAAMAAAAAAAAAAAAEAAMAAAAAAAAAAAAFAAMAAAAAAAAAAAAGAAMAAAAAAAAAAAAHAAMAAAAAAAAAAAAIAAMAAAAAAAAAAAAJAAMAAAAAAAAAAAALAAQAAAAAAAAAAAAMAAQAAAAAAAAAAAANAAQAAAAAAAAAAAAOAAQAAAAAAAAAAAAPAAQAAAAAAAAAAAAPAAMAAAAAAAAAAAAOAAMAAAAAAAAAAAANAAMAAAAAAAAAAAAIAAQAAAAAAAAAAAAJAAQAAAAAAAAAAAAKAAQAAAAAAAAAAAAHAAQAAAAAAAAAAAAGAAQAAAAAAAAAAAAFAAQAAAAAAAAAAAAEAAQAAAAAAAAAAAADAAQAAAAAAAAAAAACAAQAAAAAAAAAAAABAAQAAAAAAAAAAAAAAAQAAAAAAAAAAAAGAAUAAAAAAAAAAAAHAAUAAAAAAAAAAAAIAAUAAAAAAAAAAAAJAAUAAAAAAAAAAAAKAAUAAAAAAAAAAAALAAUAAAAAAAAAAAAMAAUAAAAAAAAAAAANAAUAAAAAAAAAAAAOAAUAAAAAAAAAAAAPAAUAAAAAAAAAAAACAAUAAAAAAAAAAAABAAUAAAAAAAAAAAAAAAUAAAAAAAAAAAADAAUAAAAAAAAAAAAEAAUAAAAAAAAAAAAFAAUAAAAAAAAAAAAPAAYAAAAAAAAAAAAAAAYAAAAAAAAAAAABAAYAAAAAAAAAAAACAAYAAAAAAAAAAAADAAYAAAAAAAAAAAAEAAYAAAAAAAAAAAAFAAYAAAAAAAAAAAAGAAYAAAAAAAAAAAAHAAYAAAAAAAAAAAAIAAYAAAAAAAAAAAAJAAYAAAAAAAAAAAAKAAYAAAAAAAAAAAALAAYAAAAAAAAAAAAMAAYAAAAAAAAAAAANAAYAAAAAAAAAAAAOAAYAAAAAAAAAAAAAAAcAAAAAAAAAAAABAAcAAAAAAAAAAAACAAcAAAAAAAAAAAADAAcAAAAAAAAAAAAEAAcAAAAAAAAAAAAFAAcAAAAAAAAAAAAGAAcAAAAAAAAAAAAHAAcAAAAAAAAAAAAIAAcAAAAAAAAAAAAJAAcAAAAAAAAAAAAKAAcAAAAAAAAAAAALAAcAAAAAAAAAAAAMAAcAAAAAAAAAAAANAAcAAAAAAAAAAAAOAAcAAAAAAAAAAAAPAAcAAAAAAAAAAAAHAAgAAAAAAAAAAAAIAAgAAAAAAAAAAAAJAAgAAAAAAAAAAAAKAAgAAAAAAAAAAAALAAgAAAAAAAAAAAAMAAgAAAAAAAAAAAANAAgAAAAAAAAAAAAOAAgAAAAAAAAAAAAPAAgAAAAAAAAAAAAAAAgAAAAAAAAAAAABAAgAAAAAAAAAAAACAAgAAAAAAAAAAAADAAgAAAAAAAAAAAAEAAgAAAAAAAAAAAAFAAgAAAAAAAAAAAAGAAgAAAAAAAAAAAAFAAkAAAAAAAAAAAAGAAkAAAAAAAAAAAAHAAkAAAAAAAAAAAAIAAkAAAAAAAAAAAAJAAkAAAAAAAAAAAAKAAkAAAAAAAAAAAALAAkAAAAAAAAAAAAMAAkAAAAAAAAAAAANAAkAAAAAAAAAAAAOAAkAAAAAAAAAAAAPAAkAAAAAAAAAAAADAAkAAAAAAAAAAAAEAAkAAAAAAAAAAAACAAkAAAAAAAAAAAABAAkAAAAAAAAAAAAAAAkAAAAAAAAAAAACAAoAAAAAAAAAAAADAAoAAAAAAAAAAAAEAAoAAAAAAAAAAAAFAAoAAAAAAAAAAAAGAAoAAAAAAAAAAAAHAAoAAAAAAAAAAAAIAAoAAAAAAAAAAAAJAAoAAAAAAAAAAAAKAAoAAAAAAAAAAAALAAoAAAAAAAAAAAAMAAoAAAAAAAAAAAANAAoAAAAAAAAAAAAOAAoAAAAAAAAAAAAPAAoAAAAAAAAAAAABAAoAAAAAAAAAAAAAAAoAAAAAAAAAAAAAAAsAAAAAAAAAAAABAAsAAAAAAAAAAAACAAsAAAAAAAAAAAADAAsAAAAAAAAAAAAEAAsAAAAAAAAAAAAFAAsAAAAAAAAAAAAGAAsAAAAAAAAAAAAHAAsAAAAAAAAAAAAIAAsAAAAAAAAAAAAJAAsAAAAAAAAAAAAKAAsAAAAAAAAAAAALAAsAAAAAAAAAAAAMAAsAAAAAAAAAAAANAAsAAAAAAAAAAAAOAAsAAAAAAAAAAAAPAAsAAAAAAAAAAAABAAwAAAAAAAAAAAACAAwAAAAAAAAAAAADAAwAAAAAAAAAAAAEAAwAAAAAAAAAAAAFAAwAAAAAAAAAAAAGAAwAAAAAAAAAAAAHAAwAAAAAAAAAAAAIAAwAAAAAAAAAAAAJAAwAAAAAAAAAAAAKAAwAAAAAAAAAAAALAAwAAAAAAAAAAAAMAAwAAAAAAAAAAAANAAwAAAAAAAAAAAAOAAwAAAAAAAAAAAAPAAwAAAAAAAAAAAAAAAwAAAAAAAAAAAACAA0AAAAAAAAAAAADAA0AAAAAAAAAAAAEAA0AAAAAAAAAAAAFAA0AAAAAAAAAAAAGAA0AAAAAAAAAAAAHAA0AAAAAAAAAAAAIAA0AAAAAAAAAAAAJAA0AAAAAAAAAAAAKAA0AAAAAAAAAAAALAA0AAAAAAAAAAAAMAA0AAAAAAAAAAAANAA0AAAAAAAAAAAAOAA0AAAAAAAAAAAAPAA0AAAAAAAAAAAABAA0AAAAAAAAAAAAAAA0AAAAAAAAAAAAQAAAAAAAAAAAAAAAQAAEAAAAAAAAAAAAQAAIAAAAAAAAAAAAQAAMAAAAAAAAAAAAQAAQAAAAAAAAAAAAQAAUAAAAAAAAAAAAQAAYAAAAAAAAAAAAQAAcAAAAAAAAAAAAQAAgAAAAAAAAAAAAQAAkAAAAAAAAAAAAPAA4AAAAAAAAAAAAQAA4AAAAAAAAAAAAQAA0AAAAAAAAAAAAQAAwAAAAAAAAAAAAQAAsAAAAAAAAAAAAQAAoAAAAAAAAAAAAPAA8AAAAAAAAAAAAQABAAAAAAAAAAAAAQAA8AAAAAAAAAAAAPABAAAAAAAAAAAAAOABAAAAAAAAAAAAANABAAAAAAAAAAAAAMABAAAAAAAAAAAAALABAAAAAAAAAAAAAKABAAAAAAAAAAAAAJABAAAAAAAAAAAAAIABAAAAAAAAAAAAAHABAAAAAAAAAAAAAGABAAAAAAAAAAAAAFABAAAAAAAAAAAAAEABAAAAAAAAAAAAADABAAAAAAAAAAAAACABAAAAAAAAAAAAABABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAA8AAAAAAAAAAAAAAA4AAAAAAAAAAAABAA4AAAAAAAAAAAABAA8AAAAAAAAAAAACAA8AAAAAAAAAAAACAA4AAAAAAAAAAAADAA4AAAAAAAAAAAADAA8AAAAAAAAAAAAEAA8AAAAAAAAAAAAFAA8AAAAAAAAAAAAGAA8AAAAAAAAAAAAHAA8AAAAAAAAAAAAEAA4AAAAAAAAAAAAFAA4AAAAAAAAAAAAGAA4AAAAAAAAAAAAHAA4AAAAAAAAAAAAIAA4AAAAAAAAAAAAJAA4AAAAAAAAAAAAKAA4AAAAAAAAAAAALAA4AAAAAAAAAAAAMAA4AAAAAAAAAAAANAA4AAAAAAAAAAAAOAA4AAAAAAAAAAAAOAA8AAAAAAAAAAAANAA8AAAAAAAAAAAAMAA8AAAAAAAAAAAALAA8AAAAAAAAAAAAKAA8AAAAAAAAAAAAJAA8AAAAAAAAAAAAIAA8AAAAAAAAAAAA=")
+tile_set = SubResource("TileSet_viiso")
+
+[node name="TileMapLayer" type="TileMapLayer" parent="GameBoard"]
+tile_set = SubResource("TileSet_35qqh")
+
+[node name="GameCanvasLayer" type="CanvasLayer" parent="."]
+visible = false
+
+[node name="PlayerLabel" type="Label" parent="GameCanvasLayer"]
+offset_right = 40.0
+offset_bottom = 23.0
+
+[node name="StartButton" type="Button" parent="GameCanvasLayer"]
+offset_left = 384.0
+offset_right = 448.0
+offset_bottom = 31.0
+text = "START"
+
+[node name="StartCanvasLayer" type="CanvasLayer" parent="."]
+visible = false
+
+[node name="ServerAddressLineEdit" type="LineEdit" parent="StartCanvasLayer"]
+offset_left = 338.81927
+offset_top = 458.8986
+offset_right = 562.8193
+offset_bottom = 489.8986
+text = "127.0.0.1"
+placeholder_text = "127.0.0.1"
+
+[node name="Label" type="Label" parent="StartCanvasLayer/ServerAddressLineEdit"]
+layout_mode = 0
+offset_left = -120.0
+offset_right = -8.0
+offset_bottom = 31.0
+text = "Adres serwera"
+vertical_alignment = 1
+
+[node name="ServerPortLineEdit" type="LineEdit" parent="StartCanvasLayer"]
+offset_left = 338.81927
+offset_top = 498.8986
+offset_right = 562.8193
+offset_bottom = 529.89856
+theme_override_colors/font_color = Color(0.875, 0.875, 0.875, 1)
+text = "5000"
+placeholder_text = "5000"
+
+[node name="Label" type="Label" parent="StartCanvasLayer/ServerPortLineEdit"]
+layout_mode = 0
+offset_left = -112.0
+offset_right = -12.0
+offset_bottom = 31.0
+text = "Port serwera"
+vertical_alignment = 1
+
+[node name="ClientPortLineEdit" type="LineEdit" parent="StartCanvasLayer"]
+offset_left = 338.81927
+offset_top = 538.89856
+offset_right = 562.8193
+offset_bottom = 569.89856
+text = "5002"
+placeholder_text = "5002"
+
+[node name="Label" type="Label" parent="StartCanvasLayer/ClientPortLineEdit"]
+layout_mode = 0
+offset_left = -104.0
+offset_right = -13.0
+offset_bottom = 31.0
+text = "Port klienta"
+vertical_alignment = 1
+
+[node name="JoinButton" type="Button" parent="StartCanvasLayer" node_paths=PackedStringArray("ServerAddressLineEdit", "ServerPortLineEdit", "ClientPortLineEdit")]
+offset_left = 338.81927
+offset_top = 578.89856
+offset_right = 486.81927
+offset_bottom = 609.89856
+text = "Dolacz"
+script = ExtResource("1_5rswr")
+ServerAddressLineEdit = NodePath("../ServerAddressLineEdit")
+ServerPortLineEdit = NodePath("../ServerPortLineEdit")
+ClientPortLineEdit = NodePath("../ClientPortLineEdit")
+
+[node name="TitleLabel" type="Label" parent="StartCanvasLayer"]
+offset_left = 266.81927
+offset_top = 210.89859
+offset_right = 566.8193
+offset_bottom = 360.8986
+rotation = -0.17453292
+scale = Vector2(1.1, 1.1)
+pivot_offset = Vector2(150, 75)
+size_flags_horizontal = 4
+text = "BOMBERMAN"
+label_settings = SubResource("LabelSettings_npm0p")
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="StartCanvasLayer/TitleLabel"]
+libraries = {
+&"": SubResource("AnimationLibrary_35qqh")
+}
+autoplay = "Title"
+
+[node name="EndCanvasLayer" type="CanvasLayer" parent="."]
+visible = false
+
+[node name="EndLabel" type="Label" parent="EndCanvasLayer"]
+offset_left = 266.81927
+offset_top = 210.89859
+offset_right = 566.8193
+offset_bottom = 360.8986
+rotation = -0.17453292
+scale = Vector2(1.1, 1.1)
+pivot_offset = Vector2(150, 75)
+size_flags_horizontal = 4
+text = "GAME OVER"
+label_settings = SubResource("LabelSettings_npm0p")
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="EndCanvasLayer/EndLabel"]
+libraries = {
+&"": SubResource("AnimationLibrary_35qqh")
+}
+autoplay = "Title"
+
+[node name="WinningPlayerLabel" type="Label" parent="EndCanvasLayer"]
+offset_left = 296.0
+offset_top = 392.0
+offset_right = 537.0
+offset_bottom = 437.0
+theme_override_font_sizes/font_size = 32
+text = "PLAYER X WON!!!"
+
+[node name="PlayAgainButton" type="Button" parent="EndCanvasLayer"]
+offset_left = 338.81927
+offset_top = 578.89856
+offset_right = 486.81927
+offset_bottom = 609.89856
+text = "Zagraj ponownie"
+
+[connection signal="pressed" from="GameCanvasLayer/StartButton" to="." method="_on_start_button_pressed"]
+[connection signal="pressed" from="StartCanvasLayer/JoinButton" to="StartCanvasLayer/JoinButton" method="_on_pressed"]
+[connection signal="pressed" from="EndCanvasLayer/PlayAgainButton" to="." method="_on_play_again_button_pressed"]

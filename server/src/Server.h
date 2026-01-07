@@ -5,33 +5,33 @@
 #include "Game.h"
 #include "Protocol.h"
 
-// Basic wrapper for POSIX sockets
 class Server {
 public:
-    Server(Game& game_inst);
+    Server(Game& game);
     ~Server();
 
     bool init();
-    void update(); // Check sockets
+    void update();
 
 private:
     void handleNewConnection();
-    void handleTcpData(int clientSock);
+    bool handleTcpData(int clientSock);
     void handleUdpData();
     void broadcastState();
+
+    bool setupTcp();
+    bool setupUdp();
 
     Game& game;
     
     int tcpListenSock;
     int udpSock;
     
-    // We keep TCP sockets open to listen for "Start Game".
-    // Map socket_fd -> playerId
-    std::map<int, uint32_t> tcpClients;
+    // socket_fd -> playerId
+    std::map<int, uint8_t> tcpClients;
     
-    // Map playerId -> UDP address (learned from incoming UDP packets)
-    struct sockaddr_in udpClients[MAX_PLAYERS + 1]; 
-    bool udpClientKnown[MAX_PLAYERS + 1];
+    // playerId -> network destination
+    std::map<uint8_t, sockaddr_in> udpClients;
     
-    uint32_t nextPlayerId;
+    uint8_t nextPlayerId;
 };
