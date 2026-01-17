@@ -48,26 +48,26 @@ public partial class GameManager : Node2D
 			_tcp.Poll();
 
 		if (_tcp.GetStatus() == StreamPeerTcp.Status.Connected) {
-            if (!_joined)
-                SendJoinPacket();
+			if (!_joined)
+				SendJoinPacket();
 
-            if (_tcp.GetAvailableBytes() > 0)
-            {
-                var data = _tcp.GetData(_tcp.GetAvailableBytes());
-                var error = (Error)(int)data[0];
-                
-                if (error == Error.Ok)
-                {
-                    var payload = data[1].As<byte[]>();
-                    var msg = BlittableBuffer.FromBytes<ConnectResponsePacket>(payload);
-                    _playerId = msg.playerId;
-                    GD.Print($"Registered as player {_playerId}");
-                    startScreen.Visible = false;
-                    SetPlayerText();
-                    gameScreen.Visible = true;
-                }
-            }
-        }
+			if (_tcp.GetAvailableBytes() > 0)
+			{
+				var data = _tcp.GetData(_tcp.GetAvailableBytes());
+				var error = (Error)(int)data[0];
+				
+				if (error == Error.Ok)
+				{
+					var payload = data[1].As<byte[]>();
+					var msg = BlittableBuffer.FromBytes<ConnectResponsePacket>(payload);
+					_playerId = msg.playerId;
+					GD.Print($"Registered as player {_playerId}");
+					startScreen.Visible = false;
+					SetPlayerText();
+					gameScreen.Visible = true;
+				}
+			}
+		}
 	}
 
 	private void HandleUdp() {
@@ -160,35 +160,35 @@ public partial class GameManager : Node2D
 		playerLabel.Text = $"Player {_playerId}";
 	}
 	
-    public Error Connect(string serverAddress, int serverPort, int clientPort)
-    {
-        // clean up previous connection if present, e.g. hanging due to wrong port
-        if (_tcp != null && _tcp.GetStatus() != StreamPeerTcp.Status.None)
-        {
-            GD.Print("Disconnecting existing TCP connection");
-            _tcp.DisconnectFromHost();
-        }
-        _tcp = new StreamPeerTcp();
-        _udp = new UdpServer();
+	public Error Connect(string serverAddress, int serverPort, int clientPort)
+	{
+		// clean up previous connection if present, e.g. hanging due to wrong port
+		if (_tcp != null && _tcp.GetStatus() != StreamPeerTcp.Status.None)
+		{
+			GD.Print("Disconnecting existing TCP connection");
+			_tcp.DisconnectFromHost();
+		}
+		_tcp = new StreamPeerTcp();
+		_udp = new UdpServer();
 
-        _joined = false;
-        _serverUdpPeer = null;
-        _clientPort = clientPort;
+		_joined = false;
+		_serverUdpPeer = null;
+		_clientPort = clientPort;
 
-        var tcpErr = _tcp.ConnectToHost(serverAddress, serverPort);
-        if (tcpErr != Error.Ok)
-        {
-            GD.PrintErr($"Could not connect: {tcpErr}");
-            return tcpErr;
-        }
-        
-        var lerr = _udp.Listen((ushort)clientPort);
-        if (lerr != Error.Ok) {
-            GD.PrintErr($"Could not listen UDP on port {clientPort}: {lerr}");
-            return lerr;
-        }
-        return Error.Ok;
-    }
+		var tcpErr = _tcp.ConnectToHost(serverAddress, serverPort);
+		if (tcpErr != Error.Ok)
+		{
+			GD.PrintErr($"Could not connect: {tcpErr}");
+			return tcpErr;
+		}
+		
+		var lerr = _udp.Listen((ushort)clientPort);
+		if (lerr != Error.Ok) {
+			GD.PrintErr($"Could not listen UDP on port {clientPort}: {lerr}");
+			return lerr;
+		}
+		return Error.Ok;
+	}
 	
 	private void SendJoinPacket() {
 		var joinPacket = new JoinPacket {
